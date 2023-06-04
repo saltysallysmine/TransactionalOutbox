@@ -59,7 +59,8 @@ public class Writer {
 
     @Transactional
     private void writeUserToBroker(Plan plan) {
-        rabbitTemplate.convertAndSend(QUERY_NAME, "{\"login\": \"%s\"}".formatted(plan.getLogin()));
+        rabbitTemplate.convertAndSend(QUERY_NAME, "{\"id\": %d, \"login\": \"%s\"}".formatted(plan.getId(),
+                plan.getLogin()));
         plan.setIsWrittenToBroker(true);
         outboxRepository.save(plan);
         log.info("Send message with User(login=%s, password=%s) to Rabbit".formatted(plan.getLogin(),
