@@ -10,7 +10,6 @@ import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,7 +30,7 @@ public class Writer {
         this.outboxRepository = outboxRepository;
         this.usersRepository = usersRepository;
         this.rabbitTemplate = rabbitTemplate;
-        this.QUERY_NAME = "QUERY";
+        this.QUERY_NAME = "EMAIL_TO_USER";
     }
 
     @Transactional
