@@ -26,8 +26,8 @@ public class TasksReceiver {
 
     @Data
     private static class MessageDTO {
-        Long id;
-        String login;
+        private Long id;
+        private String login;
     }
 
     private MessageDTO getMessageDTOFromMessageText(String text) {
@@ -45,6 +45,7 @@ public class TasksReceiver {
         if (sentEmailsId.contains(message.getId())) {
             log.info("Already sent message to this user");
         } else {
+            sentEmailsId.add(message.getId());
             log.info("Send email to User(login=%s) by Plan#%d".formatted(message.getLogin(), message.getId()));
         }
         Thread.sleep(1000);
