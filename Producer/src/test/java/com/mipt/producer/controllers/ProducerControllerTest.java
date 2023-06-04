@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.mipt.producer.model.OutboxRepository;
 
 import com.mipt.producer.model.Plan;
+import com.mipt.producer.model.UsersRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,9 @@ class ProducerControllerTest {
 
     @Autowired
     private OutboxRepository outboxRepository;
+
+    @Autowired
+    private UsersRepository usersRepository;
 
     private void configureWriter() throws Exception {
         mockMvc.perform(post("/producer/configure")).andExpect(status().isOk());
@@ -63,7 +67,7 @@ class ProducerControllerTest {
     }
 
     @Test
-    public void AddUserTest() throws Exception {
+    public void WriteToOutboxTest() throws Exception {
         // Configure writer
         configureWriter();
         // Test functions
@@ -78,6 +82,7 @@ class ProducerControllerTest {
         Plan actualPlan = actualPlanRecord.get();
         // assert plans equals
         assertPlanEquals(expectedPlan, actualPlan);
+        Thread.sleep(10000);
     }
 
 }
