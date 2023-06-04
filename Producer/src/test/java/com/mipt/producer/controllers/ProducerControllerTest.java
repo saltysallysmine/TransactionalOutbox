@@ -82,7 +82,7 @@ class ProducerControllerTest {
         Plan actualPlan = actualPlanRecord.get();
         // assert plans equals
         assertPlanEquals(expectedPlan, actualPlan);
-        Thread.sleep(10000);
+        Thread.sleep(12000);
     }
 
 }

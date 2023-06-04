@@ -3,6 +3,7 @@ package com.mipt.producer.controllers;
 import com.mipt.producer.model.OutboxRepository;
 import com.mipt.producer.model.Plan;
 
+import com.mipt.producer.model.User;
 import com.mipt.producer.model.UsersRepository;
 import jakarta.transaction.Transactional;
 
@@ -24,11 +25,13 @@ public class Writer {
     private final OutboxRepository outboxRepository;
     private final UsersRepository usersRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final String QUERY_NAME;
 
     public Writer(OutboxRepository outboxRepository, UsersRepository usersRepository, RabbitTemplate rabbitTemplate) {
         this.outboxRepository = outboxRepository;
         this.usersRepository = usersRepository;
         this.rabbitTemplate = rabbitTemplate;
+        this.QUERY_NAME = "QUERY";
     }
 
     @Transactional
@@ -42,9 +45,43 @@ public class Writer {
     }
 
     @Transactional
+    private void writeUserToDB(Plan plan) {
+        if (usersRepository.findByLogin(plan.getLogin()).isEmpty()) {
+            User user = new User();
+            user.setLogin(plan.getLogin());
+            user.setPassword(plan.getLogin());
+            usersRepository.save(user);
+            log.info("Save User(login=%s, password=%s) to Postgres".formatted(user.getLogin(), user.getPassword()));
+        }
+        plan.setIsWrittenToDB(true);
+        outboxRepository.save(plan);
+        log.info("Update outbox for Plan#" + plan.getId() + ". Written to Postgres");
+    }
+
+    @Transactional
+    private void writeUserToBroker(Plan plan) {
+        rabbitTemplate.convertAndSend(QUERY_NAME, "{\"login\": \"%s\"}".formatted(plan.getLogin()));
+        plan.setIsWrittenToBroker(true);
+        outboxRepository.save(plan);
+        log.info("Send message with User(login=%s, password=%s) to Rabbit".formatted(plan.getLogin(),
+                plan.getPassword()));
+        log.info("Update outbox for Plan#" + plan.getId() + ". Written to Rabbit");
+    }
+
+    @Transactional
     private void ImplementSinglePlan(Plan plan) {
         log.info("Start processing Plan(isWrittenToDB=%s, isWrittenToBroker=%s)"
                 .formatted(plan.getIsWrittenToDB(), plan.getIsWrittenToBroker()));
+        if (!plan.getIsWrittenToDB()) {
+            log.info("Trying to save User(login=%s, password=%s) to Postgres".formatted(plan.getLogin(),
+                    plan.getPassword()));
+            writeUserToDB(plan);
+        }
+        if (!plan.getIsWrittenToBroker()) {
+            log.info("Trying to send message with User(login=%s, password=%s) to Rabbit".formatted(plan.getLogin(),
+                    plan.getPassword()));
+            writeUserToBroker(plan);
+        }
     }
 
     @Scheduled(fixedDelay = 5000)
@@ -52,9 +89,7 @@ public class Writer {
         log.info("Scheduler starts");
         List<Plan> plansNotWritten = outboxRepository.findByProgress();
         log.info("Found " + plansNotWritten.size() + " not written tasks");
-        plansNotWritten.forEach(plan -> {
-            ImplementSinglePlan(plan);
-        });
+        plansNotWritten.forEach(this::ImplementSinglePlan);
     }
 
 }
