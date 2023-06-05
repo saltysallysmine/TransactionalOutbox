@@ -1,22 +1,28 @@
 package com.mipt.producer.controllers;
 
 import com.google.gson.Gson;
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import com.mipt.producer.model.OutboxRepository;
+
+import com.mipt.producer.model.Plan;
+import com.mipt.producer.model.UsersRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.jetbrains.annotations.NotNull;
 
+@Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
 class ProducerControllerTest {
@@ -24,37 +30,59 @@ class ProducerControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    private static ProducerController producerController;
+    @Autowired
+    private OutboxRepository outboxRepository;
 
-    @BeforeAll
-    public static void InitializeController() {
-        producerController = new ProducerController();
+    @Autowired
+    private UsersRepository usersRepository;
+
+    private void configureWriter() throws Exception {
+        mockMvc.perform(post("/producer/configure")).andExpect(status().isOk());
     }
 
-    @Data
-    @AllArgsConstructor
-    private static class RequestDTO {
-
-        @NotNull
-        String login;
-
-        @NotNull
-        String password;
-
-    }
-
-    private String getUserDTO() {
+    private String getRequestContent(RequestDTO userDTO) {
         Gson gson = new Gson();
-        RequestDTO requestDTO = new RequestDTO("User", "12345");
-        return gson.toJson(requestDTO);
+        return gson.toJson(userDTO);
+    }
+
+    private Plan getPlanFromUserDTO(RequestDTO userDTO) {
+        Plan result =  new Plan();
+        result.setLogin(userDTO.getLogin());
+        result.setPassword(userDTO.getPassword());
+        return result;
+    }
+
+    private void assertPlanEquals(Plan expectedPlan, Plan actualPlan) {
+        assertEquals(expectedPlan.getLogin(), actualPlan.getLogin());
+        assertEquals(expectedPlan.getPassword(), actualPlan.getPassword());
+        assertEquals(expectedPlan.getIsWrittenToDB(), actualPlan.getIsWrittenToDB());
+        assertEquals(expectedPlan.getIsWrittenToBroker(), actualPlan.getIsWrittenToBroker());
+    }
+
+    private String addUserAndReturnResponse(String content) throws Exception {
+        return mockMvc.perform(post("/producer/add-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(content)
+        ).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
 
     @Test
-    public void AddUserTest() throws Exception {
-        mockMvc.perform(post("/producer/add-user")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(getUserDTO())
-        ).andExpect(status().isCreated());
+    public void WriteToOutboxTest() throws Exception {
+        // Configure writer
+        configureWriter();
+        // Test functions
+        RequestDTO userDTO = new RequestDTO("User", "12345");
+        String response = addUserAndReturnResponse(getRequestContent(userDTO));
+        Long actualPlanId = Long.valueOf(response);
+        // expected plan that should be added
+        Plan expectedPlan = getPlanFromUserDTO(userDTO);
+        // actual added plan
+        Optional<Plan> actualPlanRecord = outboxRepository.findById(actualPlanId);
+        assertFalse(actualPlanRecord.isEmpty());
+        Plan actualPlan = actualPlanRecord.get();
+        // assert plans equals
+        assertPlanEquals(expectedPlan, actualPlan);
+        Thread.sleep(12000);
     }
 
 }

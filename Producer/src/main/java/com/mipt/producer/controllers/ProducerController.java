@@ -1,12 +1,11 @@
 package com.mipt.producer.controllers;
 
-import lombok.Data;
+import com.mipt.producer.model.OutboxRepository;
+import com.mipt.producer.model.UsersRepository;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import org.jetbrains.annotations.NotNull;
@@ -17,26 +16,30 @@ import org.jetbrains.annotations.NotNull;
 public class ProducerController {
 
     @Autowired
+    private OutboxRepository outboxRepository;
+
+    @Autowired
+    private UsersRepository usersRepository;
+
+    @Autowired
     private RabbitTemplate rabbitTemplate;
 
-    private static final String QUERY_NAME = "QUERY";
+    Writer writer;
 
-    @Data
-    private static class RequestDTO {
-
-        @NotNull
-        String login;
-
-        @NotNull
-        String password;
-
+    @PostMapping("/configure")
+    public void Configure() {
+        log.info("Configure writer");
+        this.writer = new Writer(outboxRepository, usersRepository, rabbitTemplate);
     }
 
+    /*
+     * Write plan to outbox and return its id
+     */
     @PostMapping("/add-user")
     @ResponseBody
-    public ResponseEntity<String> addUser(@RequestBody @NotNull RequestDTO request) {
-        log.info("Get new request: " + request);
-        return new ResponseEntity<>(HttpStatus.CREATED);
+    public Long AddUser(@RequestBody @NotNull RequestDTO user) {
+        log.info("Get new request: " + user);
+        return writer.writePlanToOutbox(user);
     }
 
 }
